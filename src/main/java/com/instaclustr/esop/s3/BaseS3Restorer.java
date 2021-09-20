@@ -5,10 +5,7 @@ import com.amazonaws.AmazonServiceException;
 import com.amazonaws.event.ProgressEvent;
 import com.amazonaws.event.ProgressEventType;
 import com.amazonaws.services.s3.AmazonS3;
-import com.amazonaws.services.s3.model.GetObjectRequest;
-import com.amazonaws.services.s3.model.ObjectListing;
-import com.amazonaws.services.s3.model.S3Object;
-import com.amazonaws.services.s3.model.S3ObjectSummary;
+import com.amazonaws.services.s3.model.*;
 import com.amazonaws.services.s3.transfer.PersistableTransfer;
 import com.amazonaws.services.s3.transfer.TransferManager;
 import com.amazonaws.services.s3.transfer.internal.S3ProgressListener;
@@ -183,6 +180,47 @@ public class BaseS3Restorer extends Restorer {
         }
         return localFileRestorer.listManifests();
     }
+
+    @Override
+    public void delete(final Path objectKey) throws Exception {
+        final RemoteObjectReference remoteObjectReference = objectKeyToNodeAwareRemoteReference(objectKey);
+        final Path fileToDelete = Paths.get(request.storageLocation.bucket,
+                remoteObjectReference.canonicalPath);
+        logger.info("Deleting S3 file {}", fileToDelete);
+        amazonS3.deleteObject(new DeleteObjectRequest(request.storageLocation.bucket, remoteObjectReference.canonicalPath));
+//        if (objectKey.toString().contains("manifests")){
+//            Files.deleteIfExists()
+//        }
+        //Files.deleteIfExists(fileToDelete);
+    }
+
+    @Override
+    public void delete(final Manifest.ManifestReporter.ManifestReport backupToDelete, final RemoveBackupRequest request) throws Exception {
+        logger.info("Deleting backup {}", backupToDelete.name);
+        if (backupToDelete.reclaimableSpace > 0 && !backupToDelete.getRemovableEntries().isEmpty()) {
+            for (final String removableEntry : backupToDelete.getRemovableEntries()) {
+                if (!request.dry) {
+                    delete(Paths.get(removableEntry));
+                } else {
+                    logger.info("Deletion of {} was executed in dry mode.", removableEntry);
+                }
+            }
+        }
+
+        // manifest and topology as the last
+        if (!request.dry) {
+            //delete in S3
+            delete(backupToDelete.manifest.objectKey);
+            //delete in local cache
+            localFileRestorer.delete(backupToDelete.manifest.objectKey);
+        } else {
+            logger.info("Deletion of manifest {} was executed in dry mode.", backupToDelete.manifest.objectKey);
+        }
+
+
+
+    }
+
 
     @Override
     public List<StorageLocation> listNodes() throws Exception {
