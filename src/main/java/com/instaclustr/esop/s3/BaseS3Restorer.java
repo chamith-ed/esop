@@ -33,6 +33,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.function.Consumer;
 import java.util.function.Predicate;
@@ -188,23 +189,24 @@ public class BaseS3Restorer extends Restorer {
                 remoteObjectReference.canonicalPath);
         logger.info("Deleting S3 file {}", fileToDelete);
         amazonS3.deleteObject(new DeleteObjectRequest(request.storageLocation.bucket, remoteObjectReference.canonicalPath));
-//        if (objectKey.toString().contains("manifests")){
-//            Files.deleteIfExists()
-//        }
-        //Files.deleteIfExists(fileToDelete);
     }
 
     @Override
     public void delete(final Manifest.ManifestReporter.ManifestReport backupToDelete, final RemoveBackupRequest request) throws Exception {
         logger.info("Deleting backup {}", backupToDelete.name);
         if (backupToDelete.reclaimableSpace > 0 && !backupToDelete.getRemovableEntries().isEmpty()) {
-            for (final String removableEntry : backupToDelete.getRemovableEntries()) {
-                if (!request.dry) {
-                    delete(Paths.get(removableEntry));
-                } else {
-                    logger.info("Deletion of {} was executed in dry mode.", removableEntry);
-                }
-            }
+            List<String> keys = backupToDelete.getRemovableEntries().stream().map(s->
+                            objectKeyToNodeAwareRemoteReference(Paths.get(s)).canonicalPath).collect(Collectors.toList());
+            String[] k = new String[keys.size()];
+            keys.toArray(k);
+            amazonS3.deleteObjects(new DeleteObjectsRequest(request.storageLocation.bucket).withKeys(k));
+//            for (final String removableEntry : backupToDelete.getRemovableEntries()) {
+//                if (!request.dry) {
+//                    delete(Paths.get(removableEntry));
+//                } else {
+//                    logger.info("Deletion of {} was executed in dry mode.", removableEntry);
+//                }
+//            }
         }
 
         // manifest and topology as the last
