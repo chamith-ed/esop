@@ -154,6 +154,7 @@ public class BaseS3Restorer extends Restorer {
     }
 
     public void downloadManifestsToDirectory(Path downloadDir) throws Exception {
+        System.out.println(downloadDir);
         FileUtils.createDirectory(downloadDir);
         FileUtils.cleanDirectory(downloadDir.toFile());
         final List<S3ObjectSummary> manifestSumms = listBucket("", s -> s.contains("manifests"));
@@ -195,11 +196,12 @@ public class BaseS3Restorer extends Restorer {
     public void delete(final Manifest.ManifestReporter.ManifestReport backupToDelete, final RemoveBackupRequest request) throws Exception {
         logger.info("Deleting backup {}", backupToDelete.name);
         if (backupToDelete.reclaimableSpace > 0 && !backupToDelete.getRemovableEntries().isEmpty()) {
+            //convert removable entries into S3 object keys
             List<String> keys = backupToDelete.getRemovableEntries().stream().map(s->
                             objectKeyToNodeAwareRemoteReference(Paths.get(s)).canonicalPath).collect(Collectors.toList());
-            String[] k = new String[keys.size()];
-            keys.toArray(k);
-            amazonS3.deleteObjects(new DeleteObjectsRequest(request.storageLocation.bucket).withKeys(k));
+            String[] objectKeys = new String[keys.size()];
+            keys.toArray(objectKeys);
+            amazonS3.deleteObjects(new DeleteObjectsRequest(request.storageLocation.bucket).withKeys(objectKeys));
 //            for (final String removableEntry : backupToDelete.getRemovableEntries()) {
 //                if (!request.dry) {
 //                    delete(Paths.get(removableEntry));
