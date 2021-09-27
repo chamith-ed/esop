@@ -197,18 +197,18 @@ public class BaseS3Restorer extends Restorer {
         logger.info("Deleting backup {}", backupToDelete.name);
         if (backupToDelete.reclaimableSpace > 0 && !backupToDelete.getRemovableEntries().isEmpty()) {
             //convert removable entries into S3 object keys
-            List<String> keys = backupToDelete.getRemovableEntries().stream().map(s->
-                            objectKeyToNodeAwareRemoteReference(Paths.get(s)).canonicalPath).collect(Collectors.toList());
-            String[] objectKeys = new String[keys.size()];
-            keys.toArray(objectKeys);
-            amazonS3.deleteObjects(new DeleteObjectsRequest(request.storageLocation.bucket).withKeys(objectKeys));
-//            for (final String removableEntry : backupToDelete.getRemovableEntries()) {
-//                if (!request.dry) {
-//                    delete(Paths.get(removableEntry));
-//                } else {
-//                    logger.info("Deletion of {} was executed in dry mode.", removableEntry);
-//                }
-//            }
+            String[] objectKeys = new String[backupToDelete.getRemovableEntries().size()];
+            int counter = 0;
+            for (final String removableEntry : backupToDelete.getRemovableEntries()) {
+                String key = objectKeyToNodeAwareRemoteReference(Paths.get(removableEntry)).canonicalPath;
+                objectKeys[counter] = key;
+                counter++;
+                logger.info("Deletion of {} has been staged.", removableEntry);
+            }
+            if (!request.dry){
+                amazonS3.deleteObjects(new DeleteObjectsRequest(request.storageLocation.bucket).withKeys(objectKeys));
+                logger.info("Deletion of files complete");
+            }
         }
 
         // manifest and topology as the last
@@ -220,8 +220,6 @@ public class BaseS3Restorer extends Restorer {
         } else {
             logger.info("Deletion of manifest {} was executed in dry mode.", backupToDelete.manifest.objectKey);
         }
-
-
 
     }
 
